@@ -62,24 +62,30 @@ function ResidueController(residueView, dataManager)
             // highlight the residues on the table
             highlightTable(event, data);
 
-            var diagram = mutationDiagram();
+            var mainView = mainMutationView();
 
-            if (diagram)
+            if (mainView)
             {
-                // TODO select diagram lollipops that are not already selected?
-                if (diagram.isHighlighted()) {
-                    diagram.clearHighlights();
-                }
-
                 // clear all residue highlights
                 residueView.unHighlightResidue();
 
+                var mutationData = mainView.model.mutationData;
                 // highlight mutations corresponding to each residue
+
+                var filtered = [];
+
                 _.each(data.selected, function(residue) {
-                    diagram.highlightMutation(defaultMutationSid(residue));
                     residueView.highlightResidue(residue);
+                    filtered = filtered.concat(
+                        _.filter(mutationData.getData(), function(mutation){
+                            return mutation.get("residue") === residue;
+                        })
+                    );
                 });
+
+                mutationData.updateHighlightedMutations(filtered);
             }
+
         });
 
         $(dataManager.dispatcher).on(EventUtils.CLUSTER_PDB_SELECT, function(event, data) {
@@ -95,17 +101,32 @@ function ResidueController(residueView, dataManager)
 
     function initMutationMapperEvents()
     {
-        var diagram = mutationDiagram();
-
-        function registerDiagramEvents(diagram)
+        function registerMainViewEvents(mainView)
         {
-            function selectHandler()
-            {
-                var residues = [];
-                var lollipops = diagram.getSelectedElements();
+            var mutationData = mainView.model.mutationData;
+            var mutationDataDispatcher = $(mutationData.dispatcher);
 
-                _.each(lollipops, function(ele) {
-                    residues.push(ele.datum().mutations[0].get('residue'));
+            mutationDataDispatcher.on(MutationDetailsEvents.MUTATION_HIGHLIGHT, function() {
+                var residues = [];
+                var mutations = mutationData.getState().highlighted;
+
+                _.each(mutations, function(mutation) {
+                    residues.push(mutation.get('residue'));
+                });
+
+                dataManager.unHighlightResidues();
+
+                if (!_.isEmpty(residues)) {
+                    dataManager.highlightResidues(residues);
+                }
+            });
+
+            mutationDataDispatcher.on(MutationDetailsEvents.MUTATION_SELECT, function() {
+                var residues = [];
+                var mutations = mutationData.getState().selected;
+
+                _.each(mutations, function(mutation) {
+                    residues.push(mutation.get('residue'));
                 });
 
                 dataManager.unSelectResidues();
@@ -113,58 +134,22 @@ function ResidueController(residueView, dataManager)
                 if (!_.isEmpty(residues)) {
                     dataManager.selectResidues(residues);
                 }
-            }
-
-            diagram.dispatcher.on(MutationDetailsEvents.LOLLIPOP_MOUSEOUT, function(datum, index) {
-                var residue = datum.mutations[0].get('residue');
-
-                if (!dataManager.isSelectedResidue(residue)) {
-                    residueView.unHighlightResidue(residue);
-                }
-            });
-
-            diagram.dispatcher.on(MutationDetailsEvents.LOLLIPOP_MOUSEOVER, function(datum, index) {
-                var residue = datum.mutations[0].get('residue');
-
-                if (!dataManager.isSelectedResidue(residue)) {
-                    residueView.highlightResidue(residue);
-                }
-            });
-
-            diagram.dispatcher.on(MutationDetailsEvents.ALL_LOLLIPOPS_DESELECTED, function() {
-                dataManager.unSelectResidues();
-            });
-
-            diagram.dispatcher.on(MutationDetailsEvents.LOLLIPOP_DESELECTED, selectHandler);
-            diagram.dispatcher.on(MutationDetailsEvents.LOLLIPOP_SELECTED, selectHandler);
-        }
-
-        function registerMainViewEvents(mainView)
-        {
-            mainView.dispatcher.on(MutationDetailsEvents.DIAGRAM_INIT, function(diagram) {
-                registerDiagramEvents(diagram);
             });
         }
 
-        // wait for the diagram to init...
-        if (!diagram)
+        // wait for the main view to init
+        var mainView = mainMutationView();
+
+        if (!mainView)
         {
-            var mainView = mainMutationView();
+            var mutationDetailsView = residueView.getMutationMapper().getView();
 
-            if (!mainView)
-            {
-                var mutationDetailsView = residueView.getMutationMapper().getView();
-
-                mutationDetailsView.dispatcher.on(MutationDetailsEvents.MAIN_VIEW_INIT, function(mainView) {
-                    registerMainViewEvents(mainView);
-                });
-            }
-            else {
+            mutationDetailsView.dispatcher.on(MutationDetailsEvents.MAIN_VIEW_INIT, function(mainView) {
                 registerMainViewEvents(mainView);
-            }
+            });
         }
         else {
-            registerDiagramEvents(diagram);
+            registerMainViewEvents(mainView);
         }
     }
 
@@ -188,13 +173,13 @@ function ResidueController(residueView, dataManager)
         {
             // set new timer
             _highlightTimer = setTimeout(function() {
-                highlightDiagram(event, data);
+                //updateHighlightData(event, data);
                 _highlightTimer = null;
             }, delay);
         }
         else
         {
-            highlightDiagram(event, data);
+            //updateHighlightData(event, data);
         }
     }
 
@@ -214,28 +199,48 @@ function ResidueController(residueView, dataManager)
         });
     }
 
-    function highlightDiagram(event, data)
+    function updateHighlightData(event, data)
     {
-        var diagram = mutationDiagram();
+        //var diagram = mutationDiagram();
+        //
+        //if (diagram)
+        //{
+        //    if (diagram.isHighlighted()) {
+        //        diagram.clearHighlights();
+        //    }
+        //
+        //    // highlight mutations corresponding to each residue
+        //    _.each(data.highlighted, function (residue) {
+        //        diagram.highlightMutation(defaultMutationSid(residue));
+        //    });
+        //
+        //    // selected mutations should always remain highlighted!
+        //    _.each(data.selected, function (residue) {
+        //        diagram.highlightMutation(defaultMutationSid(residue));
+        //    });
+        //
+        //    // highlight corresponding mutations on the 3D diagram as well
+        //    residueView.getMutationMapper().getController().get3dController().highlightSelected();
+        //}
 
-        if (diagram)
+        var mainView = mainMutationView();
+
+        if (mainView)
         {
-            if (diagram.isHighlighted()) {
-                diagram.clearHighlights();
-            }
+            var mutationData = mainView.model.mutationData;
 
             // highlight mutations corresponding to each residue
-            _.each(data.highlighted, function (residue) {
-                diagram.highlightMutation(defaultMutationSid(residue));
+            var filtered = [];
+
+            _.each(data.highlighted, function(residue) {
+                filtered = filtered.concat(
+                    _.filter(mutationData.getData(), function(mutation){
+                        return mutation.get("residue") === residue;
+                    })
+                );
             });
 
-            // selected mutations should always remain highlighted!
-            _.each(data.selected, function (residue) {
-                diagram.highlightMutation(defaultMutationSid(residue));
-            });
-
-            // highlight corresponding mutations on the 3D diagram as well
-            residueView.getMutationMapper().getController().get3dController().highlightSelected();
+            mutationData.updateHighlightedMutations(filtered);
         }
     }
 
@@ -251,7 +256,7 @@ function ResidueController(residueView, dataManager)
 
         // set new timer
         _filterTimer = setTimeout(function() {
-            filterDiagram(event, data);
+            updateFilterData(event, data);
             _transactionTimer = setTimeout(function() {
                 _transactionTimer = null;
             }, _transactionDelay);
@@ -259,39 +264,32 @@ function ResidueController(residueView, dataManager)
         }, delay);
     }
 
-    function filterDiagram(event, data)
+    function updateFilterData(event, data)
     {
-        var diagram = mutationDiagram();
+        var mainView = mainMutationView();
 
-        if (diagram)
+        if (mainView)
         {
-            // nothing filtered, just show everything...
+            var mutationData = mainView.model.mutationData;
+
             if (_.isEmpty(data.filtered))
             {
-                diagram.resetPlot();
+                mutationData.unfilterMutations();
             }
             else
             {
-                var mutationProxy = residueView.getMutationMapper().getController().getDataProxies().mutationProxy;
+                // filter mutations corresponding to each residue
+                var filtered = [];
 
-                mutationProxy.getMutationData(dataManager.getData().gene, function (mutationData) {
-                    var visibleMutations = [];
-
-                    _.each(mutationData, function (mutation) {
-                        // if hidden, exclude from the list
-                        var visible = _.find(data.filtered, function (residue) {
-                            return mutation.get("proteinChange").toLowerCase().indexOf(residue.toLowerCase()) != -1;
-                        });
-
-                        if (visible)
-                        {
-                            visibleMutations.push(mutation);
-                        }
-                    });
-
-                    // find the corresponding mutation mapper data for this hotspot mutations
-                    diagram.updatePlot(new MutationCollection(visibleMutations));
+                _.each(data.filtered, function(residue) {
+                    filtered = filtered.concat(
+                        _.filter(mutationData.getData(), function(mutation){
+                            return mutation.get("residue") === residue;
+                        })
+                    );
                 });
+
+                mutationData.updateFilteredMutations(filtered);
             }
         }
     }
@@ -314,24 +312,6 @@ function ResidueController(residueView, dataManager)
         {
             clearTimeout(_transactionTimer);
             _transactionTimer = null;
-        }
-    }
-
-    function defaultMutationSid(residue)
-    {
-        var gene = dataManager.getData().gene;
-        return gene + "_" + residue + "_" + "1";
-    }
-
-    function mutationDiagram()
-    {
-        var mainView = mainMutationView();
-
-        if (mainView &&
-            mainView.diagramView &&
-            mainView.diagramView.mutationDiagram)
-        {
-            return mainView.diagramView.mutationDiagram;
         }
     }
 
