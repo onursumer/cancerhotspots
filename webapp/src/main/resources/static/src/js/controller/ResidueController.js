@@ -66,24 +66,11 @@ function ResidueController(residueView, dataManager)
 
             if (mainView)
             {
-                // clear all residue highlights
-                residueView.unHighlightResidue();
-
+                // update mutation data
                 var mutationData = mainView.model.mutationData;
-                // highlight mutations corresponding to each residue
-
-                var filtered = [];
-
-                _.each(data.selected, function(residue) {
-                    residueView.highlightResidue(residue);
-                    filtered = filtered.concat(
-                        _.filter(mutationData.getData(), function(mutation){
-                            return mutation.get("residue") === residue;
-                        })
-                    );
-                });
-
-                mutationData.updateHighlightedMutations(filtered);
+                mutationData.updateSelectedMutations(
+                    findMutations(mutationData, data.selected),
+                    {view: residueView});
             }
 
         });
@@ -106,7 +93,12 @@ function ResidueController(residueView, dataManager)
             var mutationData = mainView.model.mutationData;
             var mutationDataDispatcher = $(mutationData.dispatcher);
 
-            mutationDataDispatcher.on(MutationDetailsEvents.MUTATION_HIGHLIGHT, function() {
+            mutationDataDispatcher.on(MutationDetailsEvents.MUTATION_HIGHLIGHT, function(event, params) {
+                // this is to prevent infinite event loop
+                if (params.view === residueView) {
+                    return;
+                }
+
                 var residues = [];
                 var mutations = mutationData.getState().highlighted;
 
@@ -121,7 +113,12 @@ function ResidueController(residueView, dataManager)
                 }
             });
 
-            mutationDataDispatcher.on(MutationDetailsEvents.MUTATION_SELECT, function() {
+            mutationDataDispatcher.on(MutationDetailsEvents.MUTATION_SELECT, function(event, params) {
+                // this is to prevent infinite event loop
+                if (params.view === residueView) {
+                    return;
+                }
+
                 var residues = [];
                 var mutations = mutationData.getState().selected;
 
@@ -173,13 +170,13 @@ function ResidueController(residueView, dataManager)
         {
             // set new timer
             _highlightTimer = setTimeout(function() {
-                //updateHighlightData(event, data);
+                updateHighlightData(event, data);
                 _highlightTimer = null;
             }, delay);
         }
         else
         {
-            //updateHighlightData(event, data);
+            updateHighlightData(event, data);
         }
     }
 
@@ -201,28 +198,6 @@ function ResidueController(residueView, dataManager)
 
     function updateHighlightData(event, data)
     {
-        //var diagram = mutationDiagram();
-        //
-        //if (diagram)
-        //{
-        //    if (diagram.isHighlighted()) {
-        //        diagram.clearHighlights();
-        //    }
-        //
-        //    // highlight mutations corresponding to each residue
-        //    _.each(data.highlighted, function (residue) {
-        //        diagram.highlightMutation(defaultMutationSid(residue));
-        //    });
-        //
-        //    // selected mutations should always remain highlighted!
-        //    _.each(data.selected, function (residue) {
-        //        diagram.highlightMutation(defaultMutationSid(residue));
-        //    });
-        //
-        //    // highlight corresponding mutations on the 3D diagram as well
-        //    residueView.getMutationMapper().getController().get3dController().highlightSelected();
-        //}
-
         var mainView = mainMutationView();
 
         if (mainView)
@@ -230,17 +205,9 @@ function ResidueController(residueView, dataManager)
             var mutationData = mainView.model.mutationData;
 
             // highlight mutations corresponding to each residue
-            var filtered = [];
-
-            _.each(data.highlighted, function(residue) {
-                filtered = filtered.concat(
-                    _.filter(mutationData.getData(), function(mutation){
-                        return mutation.get("residue") === residue;
-                    })
-                );
-            });
-
-            mutationData.updateHighlightedMutations(filtered);
+            mutationData.updateHighlightedMutations(
+                findMutations(mutationData, data.highlighted),
+                {view: residueView});
         }
     }
 
@@ -279,19 +246,32 @@ function ResidueController(residueView, dataManager)
             else
             {
                 // filter mutations corresponding to each residue
-                var filtered = [];
-
-                _.each(data.filtered, function(residue) {
-                    filtered = filtered.concat(
-                        _.filter(mutationData.getData(), function(mutation){
-                            return mutation.get("residue") === residue;
-                        })
-                    );
-                });
-
-                mutationData.updateFilteredMutations(filtered);
+                mutationData.updateFilteredMutations(
+                    findMutations(mutationData, data.filtered));
             }
         }
+    }
+
+	/**
+     * Filters mutations by residue within the given target array.
+     *
+     * @param mutationData  MutationData instance
+     * @param target        target array of Mutations
+     * @returns {Array}     filtered mutations
+     */
+    function findMutations(mutationData, target)
+    {
+        var mutations = [];
+
+        _.each(target, function(residue) {
+            mutations = mutations.concat(
+                _.filter(mutationData.getData(), function(mutation){
+                    return mutation.get("residue") === residue;
+                })
+            );
+        });
+
+        return mutations;
     }
 
     function clearTimers()
