@@ -370,9 +370,7 @@ function ResidueView(options)
                 },
                 pdbProxy: {
                     options: {
-                        servletName: 'http://www.cbioportal.org/get3dPdb.json',
-                        subService: false,
-                        listJoiner: ' '
+                        servletName: 'https://cbioportal.mskcc.org/pdb-annotation/pdb_annotation'
                     }
                 }
             }
